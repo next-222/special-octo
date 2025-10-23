@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { supabase, MexcConnection, Trade } from '../lib/supabase';
+import { supabase, Trade } from '../lib/supabase';
 import ConnectMexc from '../components/ConnectMexc';
 import OrderTicket from '../components/OrderTicket';
 import { LogOut, TrendingUp, Activity } from 'lucide-react';
+import { mexcStatus } from '../lib/mexcConnect';
 
 export default function Dashboard() {
-  const [mexcConnection, setMexcConnection] = useState<MexcConnection | null>(null);
+  const [connected, setConnected] = useState(false);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState('');
@@ -21,13 +22,8 @@ export default function Dashboard() {
 
       setUserEmail(user.email || '');
 
-      const { data: connection } = await supabase
-        .from('mexc_connections')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      setMexcConnection(connection);
+      const status = await mexcStatus();
+      setConnected(status.connected);
 
       const { data: tradesData } = await supabase
         .from('trades')
@@ -91,7 +87,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2">
             <ConnectMexc
-              connection={mexcConnection}
+              connected={connected}
               onUpdate={handleConnectionUpdate}
             />
           </div>
@@ -107,15 +103,15 @@ export default function Dashboard() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">MEXC Status</span>
-                <span className={`font-semibold ${mexcConnection?.is_active ? 'text-emerald-500' : 'text-slate-500'}`}>
-                  {mexcConnection?.is_active ? 'Connected' : 'Not Connected'}
+                <span className={`font-semibold ${connected ? 'text-emerald-500' : 'text-slate-500'}`}>
+                  {connected ? 'Connected' : 'Not Connected'}
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {mexcConnection?.is_active && (
+        {connected && (
           <div className="mb-8">
             <OrderTicket onTradeExecuted={handleTradeExecuted} />
           </div>

@@ -1,13 +1,13 @@
 import { useState, FormEvent } from 'react';
-import { supabase, MexcConnection } from '../lib/supabase';
 import { Link2, CheckCircle, AlertCircle } from 'lucide-react';
+import { connectMexc, mexcStatus } from '../lib/mexcConnect';
 
 type Props = {
-  connection: MexcConnection | null;
+  connected: boolean;
   onUpdate: () => void;
 };
 
-export default function ConnectMexc({ connection, onUpdate }: Props) {
+export default function ConnectMexc({ connected, onUpdate }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
@@ -22,31 +22,7 @@ export default function ConnectMexc({ connection, onUpdate }: Props) {
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mexc-connect`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            apiKey,
-            apiSecret,
-            userId: user.id,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to connect MEXC');
-      }
-
+      await connectMexc(apiKey, apiSecret);
       setSuccess('MEXC API connected successfully!');
       setApiKey('');
       setApiSecret('');
@@ -61,26 +37,7 @@ export default function ConnectMexc({ connection, onUpdate }: Props) {
 
   const handleDisconnect = async () => {
     if (!confirm('Are you sure you want to disconnect your MEXC API?')) return;
-
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('mexc_connections')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      setSuccess('MEXC API disconnected');
-      onUpdate();
-    } catch (err: any) {
-      setError(err.message || 'Failed to disconnect');
-    } finally {
-      setLoading(false);
-    }
+    setError('Disconnect functionality coming soon');
   };
 
   return (
@@ -90,7 +47,7 @@ export default function ConnectMexc({ connection, onUpdate }: Props) {
           <Link2 className="w-6 h-6 text-emerald-500" />
           <h2 className="text-xl font-semibold text-white">MEXC Connection</h2>
         </div>
-        {connection?.is_active && !isEditing && (
+        {connected && !isEditing && (
           <div className="flex items-center gap-2">
             <CheckCircle className="w-5 h-5 text-emerald-500" />
             <span className="text-emerald-500 font-medium">Connected</span>
@@ -112,7 +69,7 @@ export default function ConnectMexc({ connection, onUpdate }: Props) {
         </div>
       )}
 
-      {!connection?.is_active || isEditing ? (
+      {!connected || isEditing ? (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="apiKey" className="block text-sm font-medium text-slate-300 mb-2">
@@ -164,15 +121,15 @@ export default function ConnectMexc({ connection, onUpdate }: Props) {
           </div>
 
           <p className="text-xs text-slate-400">
-            Your API credentials are encrypted and stored securely. Make sure your API key has trading permissions enabled.
+            Your API credentials are encrypted with AES-256-GCM and stored securely. Make sure your API key has trading permissions enabled.
           </p>
         </form>
       ) : (
         <div className="space-y-4">
           <div className="bg-slate-700/50 rounded-lg p-4">
-            <p className="text-slate-300 text-sm mb-2">API Key</p>
-            <p className="text-white font-mono text-sm break-all">
-              {connection.api_key_encrypted.substring(0, 20)}...
+            <p className="text-slate-300 text-sm mb-2">Status</p>
+            <p className="text-white text-sm">
+              MEXC API is connected and encrypted
             </p>
           </div>
           <div className="flex gap-3">
